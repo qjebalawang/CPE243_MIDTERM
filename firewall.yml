@@ -1,0 +1,55 @@
+---
+- hosts: all
+  become: true
+  pre_tasks:
+
+  - name: Install update (CentOS)
+    tags: always
+    yum:
+      name: '*'
+      state: latest
+      update_cache: yes
+    changed_when: false
+    when: ansible_distribution == "CentOS"
+
+  - name: Install updates (Ubuntu)
+    tags: always
+    apt:
+      update_cache: yes
+    changed_when: false
+    when: ansible_distribution == "Ubuntu"
+
+- name: Set up firewall
+  hosts: all
+  become: yes
+  tasks:
+  - name: Ensure UFW firewall is installed on Ubuntu
+    apt:
+      name: ufw
+      state: present
+    when: ansible_os_family == 'Debian'
+
+  - name: Ensure firewalld service is up and running on CentOS
+    service:
+      name: firewalld
+      state: started
+      enabled: yes
+    when: ansible_os_family == 'RedHat'
+
+  - name: Allow OpenSSH traffic on Ubuntu
+    ansible.builtin.command: sudo ufw allow ssh
+    when: ansible_os_family == 'Debian'
+
+  - name: Allow OpenSSH traffic on CentOS
+    ansible.posix.firewalld:
+      service: ssh
+      state: enabled
+      permanent: yes
+      immediate: yes
+    when: ansible_os_family == 'RedHat'
+
+  - name: Ensure SELinux is enabled
+    ansible.posix.selinux:
+      policy: targeted
+      state: enforcing
+    when: ansible_os_family == 'RedHat'
